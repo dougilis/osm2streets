@@ -1,0 +1,38 @@
+name: Build osm2streets-js for the web
+on:
+  push:
+    branches: [wasm-build]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build
+        run: |
+          cd osm2streets-js
+          wasm-pack build --release --target web
+          ls -la pkg
+      - name: Publish the build to the wasm-out branch
+        run: |
+          mkdir -p /tmp/out && cp osm2streets-js/pkg/* /tmp/out/
+          echo "Built from ${GITHUB_SHA} on $(date -u +%Y-%m-%dT%H:%MZ)" > /tmp/out/BUILD.txt
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan wasm-out
+          git rm -rf --quiet .
+          cp /tmp/out/* .
+          git add -A
+          git commit -m "osm2streets-js web build"
+          git push -f origin wasm-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: osm2streets-js-web
+          path: osm2streets-js/pkg
